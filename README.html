@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة المضرب والكرة</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 15px;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .game-container {
+            position: relative;
+            width: 100%;
+            background-color: #0a0e29;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            background-color: #0a0e29;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 10px;
+        }
+        
+        .touch-controls {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            gap: 10px;
+        }
+        
+        .touch-area {
+            flex: 1;
+            height: 120px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            user-select: none;
+            touch-action: none;
+            transition: background-color 0.2s;
+        }
+        
+        .touch-area:active {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .instructions {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        
+        .instructions ul {
+            padding-right: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 24px;
+            }
+            
+            .game-info {
+                font-size: 16px;
+            }
+            
+            .touch-area {
+                height: 100px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>لعبة المضرب والكرة</h1>
+        
+        <div class="game-info">
+            <div>النقاط: <span id="score">0</span></div>
+            <div>الأرواح: <span id="lives">3</span></div>
+        </div>
+        
+        <div class="game-container">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="touch-controls">
+                <div class="touch-area" id="leftControl">◀</div>
+                <div class="touch-area" id="rightControl">▶</div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>تعليمات اللعبة</h3>
+            <ul>
+                <li>استخدم الأسهم على الكيبورد للتحكم بالمضرب</li>
+                <li>أو انقر على الجانب الأيسر/الأيمن من الشاشة للتحريك</li>
+                <li>امنع الكرة من الخروج من الأسفل</li>
+                <li>كل كتلة تمسها الكرة تضيف نقطة</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // الحصول على عناصر DOM
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const leftControl = document.getElementById('leftControl');
+        const rightControl = document.getElementById('rightControl');
+        
+        // ضبط أبعاد canvas لتتناسب مع الشاشة
+        function resizeCanvas() {
+            const container = document.querySelector('.game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = Math.min(container.clientWidth * 0.7, 400);
+        }
+        
+        // المتغيرات الأساسية للعبة
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        
+        // أبعاد المضرب
+        const paddle = {
+            width: 0,
+            height: 0,
+            x: 0,
+            speed: 0,
+            maxSpeed: 8
+        };
+        
+        // الكرة
+        const ball = {
+            x: 0,
+            y: 0,
+            radius: 0,
+            speedX: 0,
+            speedY: 0,
+            initialSpeed: 4
+        };
+        
+        // الكتل
+        const bricks = {
+            rows: 3,
+            cols: 5,
+            width: 0,
+            height: 0,
+            padding: 2,
+            offsetTop: 0,
+            offsetLeft: 0,
+            array: []
+        };
+        
+        // تهيئة اللعبة
+        function init() {
+            resizeCanvas();
+            
+            // تهيئة المضرب
+            paddle.width = canvas.width / 6;
+            paddle.height = canvas.height / 25;
+            paddle.x = (canvas.width - paddle.width) / 2;
+            paddle.speed = 0;
+            
+            // تهيئة الكرة
+            ball.radius = canvas.width / 50;
+            resetBall();
+            
+            // تهيئة الكتل
+            initBricks();
+            
+            // إضافة مستمعي الأحداث
+            window.addEventListener('resize', resizeCanvas);
+            document.addEventListener('keydown', keyDownHandler);
+            document.addEventListener('keyup', keyUpHandler);
+            
+            // إضافة مستمعي الأحداث للتحكم باللمس
+            leftControl.addEventListener('touchstart', () => movePaddleLeft());
+            leftControl.addEventListener('touchend', stopPaddle);
+            leftControl.addEventListener('mousedown', () => movePaddleLeft());
+            leftControl.addEventListener('mouseup', stopPaddle);
+            
+            rightControl.addEventListener('touchstart', () => movePaddleRight());
+            rightControl.addEventListener('touchend', stopPaddle);
+            rightControl.addEventListener('mousedown', () => movePaddleRight());
+            rightControl.addEventListener('mouseup', stopPaddle);
+            
+            // بدء حلقة اللعبة
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // تهيئة الكتل
+        function initBricks() {
+            bricks.width = (canvas.width - (bricks.padding * (bricks.cols + 1))) / bricks.cols;
+            bricks.height = canvas.height / 20;
+            bricks.offsetTop = canvas.height / 10;
+            bricks.offsetLeft = bricks.padding;
+            
+            bricks.array = [];
+            for (let c = 0; c < bricks.cols; c++) {
+                bricks.array[c] = [];
+                for (let r = 0; r < bricks.rows; r++) {
+                    bricks.array[c][r] = { x: 0, y: 0, status: 1 };
+                }
+            }
+        }
+        
+        // إعادة ضبط الكرة
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height - 50;
+            ball.speedX = (Math.random() * 2 - 1) * ball.initialSpeed;
+            ball.speedY = -ball.initialSpeed;
+        }
+        
+        // التحكم بالمضرب باستخدام لوحة المفاتيح
+        function keyDownHandler(e) {
+            if (e.key === "Right" || e.key === "ArrowRight") {
+                movePaddleRight();
+            } else if (e.key === "Left" || e.key === "ArrowLeft") {
+                movePaddleLeft();
+            }
+        }
+        
+        function keyUpHandler() {
+            stopPaddle();
+        }
+        
+        // تحريك المضرب لليسار
+        function movePaddleLeft() {
+            paddle.speed = -paddle.maxSpeed;
+        }
+        
+        // تحريك المضرب لليمين
+        function movePaddleRight() {
+            paddle.speed = paddle.maxSpeed;
+        }
+        
+        // إيقاف المضرب
+        function stopPaddle() {
+            paddle.speed = 0;
+        }
+        
+        // تحديث حالة اللعبة
+        function update() {
+            if (!gameRunning) return;
+            
+            // تحريك المضرب
+            paddle.x += paddle.speed;
+            
+            // التأكد من أن المضرب لا يخرج عن حدود الشاشة
+            if (paddle.x < 0) {
+                paddle.x = 0;
+            } else if (paddle.x + paddle.width > canvas.width) {
+                paddle.x = canvas.width - paddle.width;
+            }
+            
+            // تحريك الكرة
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+            
+            // اكتشاف التصادم مع الجدران
+            if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                ball.speedX = -ball.speedX;
+            }
+            
+            if (ball.y - ball.radius < 0) {
+                ball.speedY = -ball.speedY;
+            }
+            
+            // اكتشاف خروج الكرة من الأسفل
+            if (ball.y + ball.radius > canvas.height) {
+                lives--;
+                livesElement.textContent = lives;
+                
+                if (lives <= 0) {
+                    gameOver();
+                } else {
+                    resetBall();
+                }
+            }
+            
+            // اكتشاف التصادم مع المضرب
+            if (
+                ball.y + ball.radius > canvas.height - paddle.height &&
+                ball.x > paddle.x &&
+                ball.x < paddle.x + paddle.width
+            ) {
+                // حساب زاوية الارتداد بناءً على مكان الاصطدام بالمضرب
+                const hitPos = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                ball.speedX = hitPos * 5;
+                ball.speedY = -Math.abs(ball.speedY);
+            }
+            
+            // اكتشاف التصادم مع الكتل
+            for (let c = 0; c < bricks.cols; c++) {
+                for (let r = 0; r < bricks.rows; r++) {
+                    const brick = bricks.array[c][r];
+                    if (brick.status === 1) {
+                        const brickX = c * (bricks.width + bricks.padding) + bricks.offsetLeft;
+                        const brickY = r * (bricks.height + bricks.padding) + bricks.offsetTop;
+                        
+                        if (
+                            ball.x > brickX &&
+                            ball.x < brickX + bricks.width &&
+                            ball.y > brickY &&
+                            ball.y < brickY + bricks.height
+                        ) {
+                            ball.speedY = -ball.speedY;
+                            brick.status = 0;
+                            score += 10;
+                            scoreElement.textContent = score;
+                            
+                            // التحقق من فوز اللاعب
+                            if (score >= bricks.rows * bricks.cols * 10) {
+                                gameWin();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // رسم العناصر على الشاشة
+        function draw() {
+            // مسح الشاشة
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // رسم الخلفية
+            ctx.fillStyle = '#0a0e29';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // رسم المضرب
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(paddle.x, canvas.height - paddle.height, paddle.width, paddle.height);
+            
+            // رسم الكرة
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.closePath();
+            
+            // رسم الكتل
+            for (let c = 0; c < bricks.cols; c++) {
+                for (let r = 0; r < bricks.rows; r++) {
+                    if (bricks.array[c][r].status === 1) {
+                        const brickX = c * (bricks.width + bricks.padding) + bricks.offsetLeft;
+                        const brickY = r * (bricks.height + bricks.padding) + bricks.offsetTop;
+                        
+                        ctx.fillStyle = '#FF5252';
+                        ctx.fillRect(brickX, brickY, bricks.width, bricks.height);
+                        
+                        ctx.strokeStyle = '#0a0e29';
+                        ctx.strokeRect(brickX, brickY, bricks.width, bricks.height);
+                    }
+                }
+            }
+            
+            // عرض رسالة نهاية اللعبة
+            if (!gameRunning) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.font = '24px Arial';
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                
+                if (lives <= 0) {
+                    ctx.fillText('انتهت اللعبة!', canvas.width / 2, canvas.height / 2 - 15);
+                    ctx.fillText(`النقاط النهائية: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+                } else {
+                    ctx.fillText('مبروك! فزت باللعبة!', canvas.width / 2, canvas.height / 2 - 15);
+                    ctx.fillText(`النقاط النهائية: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+                }
+                
+                ctx.font = '18px Arial';
+                ctx.fillText('انقر لإعادة التشغيل', canvas.width / 2, canvas.height / 2 + 45);
+            }
+        }
+        
+        // نهاية اللعبة (خسارة)
+        function gameOver() {
+            gameRunning = false;
+        }
+        
+        // فوز اللاعب
+        function gameWin() {
+            gameRunning = false;
+        }
+        
+        // إعادة تشغيل اللعبة
+        function restartGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            
+            scoreElement.textContent = score;
+            livesElement.textContent = lives;
+            
+            resetBall();
+            initBricks();
+        }
+        
+        // حلقة اللعبة الرئيسية
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // إعادة التشغيل عند النقر بعد انتهاء اللعبة
+        canvas.addEventListener('click', () => {
+            if (!gameRunning) {
+                restartGame();
+            }
+        });
+        
+        // بدء اللعبة
+        init();
+    </script>
+</body>
+  </html>
